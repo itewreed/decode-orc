@@ -29,10 +29,6 @@ std::string tv_system_name(VBITVSystem tv_system) {
   return "unknown";
 }
 
-std::string tt_system_name(VBITeletextSystem tt_system) {
-  return (tt_system == VBITeletextSystem::kWST) ? "WST" : "NABTS";
-}
-
 }  // namespace
 
 std::vector<std::string> validate_vbi_source_config(
@@ -104,16 +100,16 @@ std::vector<std::string> validate_vbi_source_config(
   const uint32_t standard_lines =
       standard_teletext_lines_per_field(format.tv_system, format.tt_system);
   if (standard_lines == 0) {
-    errors.push_back("teletext.system " + tt_system_name(format.tt_system) +
+    errors.push_back("teletext.system " + to_string(format.tt_system) +
                      " has no defined line list on " +
                      tv_system_name(format.tv_system) +
-                     "; WST is defined on PAL and on 525-line systems, and "
-                     "NABTS on NTSC/PAL_M.");
+                     "; WST is defined on PAL and on 525-line systems, "
+                     "NABTS on NTSC/PAL_M, and VideoDat on PAL.");
   } else if (format.field_range.count() > standard_lines) {
     errors.push_back(
         "container.field_range selects " +
         std::to_string(format.field_range.count()) +
-        " records per field, but " + tt_system_name(format.tt_system) + " on " +
+        " records per field, but " + to_string(format.tt_system) + " on " +
         tv_system_name(format.tv_system) + " defines only " +
         std::to_string(standard_lines) +
         " teletext lines per field; the excess records have no frame line to "

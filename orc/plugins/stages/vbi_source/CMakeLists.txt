@@ -1,7 +1,8 @@
 # VBI Source Stage Plugin
 #
-# Ingests third-party raw VBI teletext captures (bt8x8 and family card dumps,
-# cropped .tbc VBI files) and presents them to the teletext decoders as CVBS.
+# Ingests third-party raw VBI captures (bt8x8 and family card dumps, cropped
+# .tbc VBI files) and presents them to the teletext and VideoDat decoders as
+# CVBS.
 #
 # The container model, transports, reader, calibration and frame builder build
 # as a plugin-side static library so they can be unit tested directly. It
@@ -24,6 +25,7 @@ add_library(orc-vbi-source STATIC
     vbi_resampler.cpp
     vbi_cri_template.cpp
     vbi_cri_correlator.cpp
+    vbi_start_edge_locator.cpp
     vbi_offset_calibration.cpp
     vbi_frame_builder.cpp
     vbi_frame_index.cpp

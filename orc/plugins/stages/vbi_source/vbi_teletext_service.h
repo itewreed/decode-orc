@@ -17,6 +17,19 @@
 
 namespace orc {
 
+// What a service's timing is measured against when the capture offset or the
+// anchor is fitted.
+enum class VBITimingReference {
+  // A clock run-in and framing code, correlated against a generated template
+  // (vbi_cri_template.h).  Every teletext system.
+  kClockRunIn,
+
+  // The leading edge of the first byte's start bit, found by the byte framing
+  // around it (vbi_start_edge_locator.h).  An asynchronously framed service
+  // with nothing ahead of its data, which is what VideoDat is.
+  kStartBitEdge,
+};
+
 // Timing of one VBI data service, as the stage needs it to place and measure
 // a data line (design §5.2).
 //
@@ -48,6 +61,29 @@ struct VBITeletextService {
 
   // Payload length in bytes, framing code excluded.
   uint32_t payload_bytes = 0;
+
+  // Bits transmitted on a line when the line is not a teletext packet, so that
+  // run-in, framing code and payload do not describe it.  Zero for teletext.
+  uint32_t line_bits = 0;
+
+  // Bit periods of guard held either side of the data region when it is cut
+  // out of a record.  One is enough for a service whose anchor is fitted to a
+  // fraction of a sample; a service whose anchor varies between transmissions
+  // by more than the fit can be trusted to settle needs more.
+  uint32_t guard_bits = 1;
+
+  // Bits after the anchor from which the logic 1 level is read as an upper
+  // quantile.  The clock run-in for teletext; the whole data region for a
+  // service with no run-in, whose ones are scattered through its data.
+  uint32_t peak_reference_bits = 0;
+
+  VBITimingReference timing_reference = VBITimingReference::kClockRunIn;
+
+  // Bits from the anchor to the end of the last transmitted bit.
+  uint32_t transmitted_bits() const {
+    return (line_bits > 0) ? line_bits
+                           : cri_bits + frc_bits + payload_bytes * 8u;
+  }
 
   // Samples occupied by one transmitted bit at a source's sampling rate.
   double samples_per_bit(double sample_rate_hz) const {

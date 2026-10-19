@@ -75,9 +75,7 @@ bool make_vbi_data_placement(const VBISourceFormat& format,
       service.t_offset_ns * 1e-9 * output_rate_hz;
 
   const double transmitted_bits =
-      static_cast<double>(service.cri_bits) +
-      static_cast<double>(service.frc_bits) +
-      static_cast<double>(service.payload_bytes) * 8.0;
+      static_cast<double>(service.transmitted_bits());
   out_placement.data_end_samples =
       (service.bit_rate_hz > 0.0)
           ? out_placement.data_start_samples +
@@ -94,8 +92,10 @@ bool make_vbi_data_placement(const VBISourceFormat& format,
                   out_placement.source_position_at_output_zero) /
                  ratio);
 
-  // Guard held either side of the data region: one transmitted bit period.
-  const double guard = service.samples_per_bit(output_rate_hz);
+  // Guard held either side of the data region: the service's guard in
+  // transmitted bit periods, one for every teletext system.
+  const double guard = service.samples_per_bit(output_rate_hz) *
+                       static_cast<double>(service.guard_bits);
   const double region_begin =
       std::floor(out_placement.data_start_samples - guard);
   const double region_end = std::ceil(out_placement.data_end_samples + guard);

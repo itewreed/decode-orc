@@ -454,6 +454,117 @@ VBISourceFormat make_tbc_vbi_ntsc(VBITeletextSystem tt_system) {
   return format;
 }
 
+// ---------------------------------------------------------------------------
+// Pro7 Channel VideoDat (1990-1994).
+//
+// Not teletext: a 2 Mbit/s NRZ byte stream, ten asynchronously framed bytes per
+// line (a start bit, eight data bits least significant first and a stop bit,
+// every byte inverted), on three lines per field.  There is no clock run-in and
+// no framing code, so the capture offset is fitted against the start bit of the
+// first byte instead (vbi_start_edge_locator.h).
+// ---------------------------------------------------------------------------
+
+// How far either side of the position the folkloric offset predicts the start
+// edge is looked for, in 8 x fsc samples.  Wider than the teletext entry's,
+// because the VideoDat anchor is itself a measurement that moves between
+// recordings: the two reference captures put the start edge at 11,7 and 12,6
+// us from 0H.  1,5 us either side covers both with margin.
+constexpr double kBt8x8VideoDatSearchToleranceSamples = 53.0;
+
+// Fraction of the sampled records that must lock.  VideoDat sits on two or
+// three lines of the sixteen a field stores, 12 to 19% before a single line is
+// lost to tape; the reference card capture locks on 18,8% of its records and
+// the reference crop, an LP tape, on 8,6%.  The SECAM entry's
+// reasoning applies: the absolute floor of accepted records, the spread limit
+// and the drift check are what catch a wrong container, and this figure only
+// asks that a data line turned up at all.
+constexpr double kVideoDatMinimumAcceptanceFraction = 0.05;
+
+// A bt8x8 dump of a VideoDat broadcast.  The container is the PAL WST one byte
+// for byte — the same card, the same driver norm and the same sixteen records
+// per field — so only the data service, and with it the calibration, differs.
+//
+// All sixteen records are placed, not just the three lines the service was
+// transmitted on.  A bt848 that has not settled its vertical sync moves the
+// data lines by a few records from frame to frame at the start of a recording,
+// and the sink finds them by their byte framing wherever they land; placing
+// only the nominal three would throw those lines away.
+VBISourceFormat make_bt8x8_videodat() {
+  VBISourceFormat format = make_bt8x8_pal();
+  format.tt_system = VBITeletextSystem::kVideoDat;
+
+  // The reference capture, a 1994 off-air recording, puts the start edge at
+  // 159,2 samples into the record with a spread under one sample, which is the
+  // tight figure; the limits are the PAL entry's, which are about the card
+  // rather than the service.
+  format.calibration.search_tolerance_samples =
+      kBt8x8VideoDatSearchToleranceSamples;
+  format.calibration.minimum_acceptance_fraction =
+      kVideoDatMinimumAcceptanceFraction;
+  return format;
+}
+
+// Cropped VBI-only PAL .tbc: the sixteen line records of each field of a
+// decoded vhs-decode/ld-decode .tbc that carry field lines 7-22, at the
+// decoder's own 4 x fsc rate.  The rate is taken from the CVBS constants so
+// that it is bit-identical to the output lattice's and the record is copied
+// rather than filtered.
+constexpr double kTBCVBIPALSampleRateHz = kPalSampleRate;
+
+// A PAL .tbc line is the whole line: 1135 samples with no padding.  The two
+// extra samples of each PAL field sit on its last line, which a VBI crop never
+// reaches.
+constexpr uint32_t kTBCVBIPALRecordStride = 1135;
+
+// Records 0-15 are field lines 7-22 of both fields — the 625-line VBI list the
+// bt8x8 card stores, which is why the crop maps onto the same frame lines.
+// Measured on the reference crop against the .tbc it was cut from: each field's
+// sixteen records are byte-identical to lines 6-21 (0-based) of the source
+// field, and 36 320 bytes a field divides its length exactly.
+constexpr uint32_t kTBCVBIPALFieldLines = 16;
+
+// How far either side of the service's nominal anchor the start edge is looked
+// for, in 4 x fsc samples: 1,5 us, for the reason the bt8x8 entry gives.
+constexpr double kTBCVBIPALVideoDatSearchToleranceSamples = 27.0;
+
+VBISourceFormat make_tbc_vbi_pal_videodat() {
+  VBISourceFormat format;
+  format.sample_rate_hz = kTBCVBIPALSampleRateHz;
+  format.line_length = kTBCVBIPALRecordStride;
+  format.valid_samples = kTBCVBIPALRecordStride;
+  format.sample_format = VBISampleFormat::kU16LE;
+  format.field_lines = kTBCVBIPALFieldLines;
+  format.field_range = VBIFieldRange{0, kTBCVBIPALFieldLines - 1};
+  format.frame_trailer_bytes = 0;
+  format.frame_trailer_is_counter = false;
+
+  // Family B, exactly as the 525-line crop: the offset is zero by construction
+  // and what is measured is the anchor (design §5.3.3).
+  format.capture_offset_samples = 0.0;
+  format.capture_offset_is_auto = false;
+
+  // The reference crop's .tbc.json marks its first field as field 1, and its
+  // fields alternate throughout.
+  format.first_field = kFirstStoredField;
+  format.tv_system = VBITVSystem::kPAL;
+  format.tt_system = VBITeletextSystem::kVideoDat;
+  format.family = VBISourceFamily::kTBCDerived;
+
+  // The survey on this family measures the anchor.  A time-base corrected
+  // source should be tight, but the reference crop is an LP tape whose start
+  // edge scatters by about a sample and a half, so the rejection limit is the
+  // 525-line crop's three samples — 170 ns here — and the tight figure is left
+  // where it is so a clean crop is still reported as one.
+  format.calibration.search_tolerance_samples =
+      kTBCVBIPALVideoDatSearchToleranceSamples;
+  format.calibration.tight_spread_samples = 0.5;
+  format.calibration.maximum_spread_samples = 3.0;
+  format.calibration.maximum_drift_samples = 3.0;
+  format.calibration.minimum_acceptance_fraction =
+      kVideoDatMinimumAcceptanceFraction;
+  return format;
+}
+
 const std::vector<PresetEntry>& presets() {
   // Every preset is a complete configuration: the container, the data service
   // it carries and the policies that follow from both.  There is nothing left
@@ -479,6 +590,8 @@ const std::vector<PresetEntry>& presets() {
        make_tbc_vbi_ntsc(VBITeletextSystem::kWST)},
       {".tbc VBI crop, 16-bit (NABTS)",
        make_tbc_vbi_ntsc(VBITeletextSystem::kNABTS)},
+      {"bt8x8 card dump, 8-bit (VideoDat)", make_bt8x8_videodat()},
+      {".tbc VBI crop, 16-bit (VideoDat)", make_tbc_vbi_pal_videodat()},
   };
   return kPresets;
 }
@@ -493,11 +606,21 @@ uint32_t standard_teletext_lines_per_field(VBITVSystem tv_system,
     return 16;
   }
 
+  // VideoDat was transmitted on three lines a field, but those lines move on a
+  // capture whose vertical sync has not settled, so the stage places the whole
+  // of the 625-line VBI list a card stores — the WST one — and leaves finding
+  // the data lines to the sink.
+  if (tv_system == VBITVSystem::kPAL &&
+      tt_system == VBITeletextSystem::kVideoDat) {
+    return 16;
+  }
+
   // ITU-R BT.653 §2: both 525-line teletext systems in scope — System B, the
   // 525-line variant of WST, and System C (NABTS) — occupy broadcast frame
   // lines 10-21 and 273-284, twelve records per field.  The systems differ in
   // framing code and packet length, not in which lines they sit on.
-  if (tv_system == VBITVSystem::kNTSC || tv_system == VBITVSystem::kPALM) {
+  if ((tv_system == VBITVSystem::kNTSC || tv_system == VBITVSystem::kPALM) &&
+      tt_system != VBITeletextSystem::kVideoDat) {
     return 12;
   }
 
@@ -558,6 +681,18 @@ std::string to_string(VBISampleFormat sample_format) {
       return "s16le";
   }
   return "u8";
+}
+
+std::string to_string(VBITeletextSystem tt_system) {
+  switch (tt_system) {
+    case VBITeletextSystem::kWST:
+      return "WST";
+    case VBITeletextSystem::kNABTS:
+      return "NABTS";
+    case VBITeletextSystem::kVideoDat:
+      return "VideoDat";
+  }
+  return "WST";
 }
 
 }  // namespace orc

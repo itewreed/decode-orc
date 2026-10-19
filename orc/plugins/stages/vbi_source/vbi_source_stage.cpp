@@ -62,9 +62,8 @@ constexpr const char* kDropsPad = "pad";
 
 // Spellings the stage's provenance and observations use for what a preset
 // turned out to describe.  Nothing configures these any more; they are read
-// back off the expanded format.
-constexpr const char* kTeletextWST = "WST";
-constexpr const char* kTeletextNABTS = "NABTS";
+// back off the expanded format.  The data service is spelled by the format's
+// own to_string().
 constexpr const char* kTvSystemPAL = "PAL";
 constexpr const char* kTvSystemNTSC = "NTSC";
 
@@ -93,9 +92,15 @@ const char* tv_system_name(VBITVSystem tv_system) {
   return (tv_system == VBITVSystem::kNTSC) ? kTvSystemNTSC : kTvSystemPAL;
 }
 
-const char* teletext_system_name(VBITeletextSystem tt_system) {
-  return (tt_system == VBITeletextSystem::kNABTS) ? kTeletextNABTS
-                                                  : kTeletextWST;
+std::string teletext_system_name(VBITeletextSystem tt_system) {
+  return to_string(tt_system);
+}
+
+// What a service's timing is measured against, as the log names it.
+const char* timing_feature_name(const VBITeletextService& service) {
+  return (service.timing_reference == VBITimingReference::kStartBitEdge)
+             ? "start-bit edge"
+             : "clock run-in";
 }
 
 // The project's television system, as the source format model spells it.  An
@@ -539,20 +544,22 @@ double measure_service_anchor_ns(const VBILineReader& reader,
   if (!measure_vbi_service_anchor(reader, service, calibration_config,
                                   calibration, error)) {
     ORC_LOG_WARN(
-        "{}: the clock run-in of '{}' could not be looked for ({}); the "
-        "service's tabulated anchor of {:.0f} ns is used as transmitted.",
-        kStageName, input_path, error, service.t_offset_ns);
+        "{}: the {} of '{}' could not be looked for ({}); the service's "
+        "tabulated anchor of {:.0f} ns is used as transmitted.",
+        kStageName, timing_feature_name(service), input_path, error,
+        service.t_offset_ns);
     return service.t_offset_ns;
   }
 
   if (!calibration.converged) {
     ORC_LOG_WARN(
-        "{}: the clock run-in of '{}' was not found well enough to measure "
-        "where the transmission put it: {} {} The service's tabulated anchor "
-        "of {:.0f} ns is used instead, which is right for a transmission that "
-        "matches it and clips the head of the data line for one that does not.",
-        kStageName, input_path, join_messages(calibration.diagnostics),
-        calibration.summary, service.t_offset_ns);
+        "{}: the {} of '{}' was not found well enough to measure where the "
+        "transmission put it: {} {} The service's tabulated anchor of {:.0f} "
+        "ns is used instead, which is right for a transmission that matches "
+        "it and clips the head of the data line for one that does not.",
+        kStageName, timing_feature_name(service), input_path,
+        join_messages(calibration.diagnostics), calibration.summary,
+        service.t_offset_ns);
     return service.t_offset_ns;
   }
 
@@ -571,11 +578,12 @@ double measure_service_anchor_ns(const VBILineReader& reader,
 
   ORC_LOG_INFO(
       "{}: capture offset held at 0.00 samples, which is what a time-base "
-      "corrected record starts at. Run-in measured at {:.0f} ns from 0H "
+      "corrected record starts at. The {} measured at {:.0f} ns from 0H "
       "against the service's tabulated {:.0f} ns, a difference of {:.2f} "
       "samples; the data window follows the measurement. Spread {:.2f} "
       "samples ({}), locked on {} of {} records ({:.1f}%).",
-      kStageName, measured_ns, service.t_offset_ns,
+      kStageName, timing_feature_name(service), measured_ns,
+      service.t_offset_ns,
       (measured_ns - service.t_offset_ns) * 1e-9 *
           reader.format().sample_rate_hz,
       calibration.spread_samples,
@@ -825,7 +833,7 @@ std::vector<ArtifactPtr> VBISourceStage::execute(
                           std::string(tv_system_name(format.tv_system)));
 
   ORC_LOG_INFO(
-      "{}: loaded '{}' — {} format, {} {} teletext, {} stored frames, {} "
+      "{}: loaded '{}' — {} format, {} {} service, {} stored frames, {} "
       "output frames. {}",
       kStageName, configuration.input_path, configuration.format_preset,
       tv_system_name(format.tv_system), teletext_system_name(format.tt_system),
@@ -931,7 +939,23 @@ std::vector<ParameterDescriptor> VBISourceStage::get_parameter_descriptors(
         "already 0H and the levels are already absolute, so neither is "
         "measured. Pick the variant matching the service the broadcast "
         "carried: nothing in the file records it, and the two differ only in "
-        "framing code and packet length.";
+        "framing code and packet length."
+        "\n\n"
+        "bt8x8 card dump, 8-bit (VideoDat): the PAL bt8x8 container above, "
+        "byte for byte, from a Pro7 Channel VideoDat broadcast. VideoDat has "
+        "no clock run-in, so the card's time from 0H is measured from the "
+        "start bit of each line's first byte instead; all sixteen records are "
+        "placed, because the data lines move between records while a card's "
+        "vertical sync settles, and the VideoDat Sink finds them by their "
+        "byte framing."
+        "\n\n"
+        ".tbc VBI crop, 16-bit (VideoDat): the sixteen line records of each "
+        "field of a decoded 625-line .tbc that carry field lines 7-22. 1135 "
+        "samples per record with no padding, unsigned 16-bit, at 4x fsc "
+        "(17 734 475 Hz). Sample 0 of every record is already 0H and the "
+        "levels are already absolute; where the broadcaster put the start of "
+        "the data, which differs between recordings by up to a microsecond, "
+        "is measured.";
     pd.type = ParameterType::STRING;
     pd.constraints.required = true;
     pd.constraints.default_value = std::string(default_preset_for(tv_system));

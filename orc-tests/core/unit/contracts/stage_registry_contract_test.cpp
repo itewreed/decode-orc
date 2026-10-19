@@ -224,6 +224,7 @@ TEST(StageRegistryContractTest, Migrated_StagesLoadFromRuntimePlugins) {
   EXPECT_TRUE(loaded_stage_names.count("snr_analysis_sink") > 0);
   EXPECT_TRUE(loaded_stage_names.count("burst_level_analysis_sink") > 0);
   EXPECT_TRUE(loaded_stage_names.count("teletext_sink") > 0);
+  EXPECT_TRUE(loaded_stage_names.count("videodat_sink") > 0);
 }
 
 TEST(NodeTypeContractTest, All_PublicStagesAppearInNodeTypeDiscovery) {

@@ -18,6 +18,7 @@
 #include "vbi_cri_template.h"
 #include "vbi_line_reader.h"
 #include "vbi_source_format.h"
+#include "vbi_start_edge_locator.h"
 #include "vbi_teletext_service.h"
 
 namespace orc {
