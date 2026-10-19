@@ -34,9 +34,15 @@ enum class VBITVSystem {
 };
 
 // VBI data service carried on the captured lines.
+//
+// Named for the two teletext systems the stage was written for, and kept so
+// because every one of its users asks the same question of it: which service
+// sits on the lines.  VideoDat is not teletext, but it is answered the same
+// way.
 enum class VBITeletextSystem {
-  kWST,    // Teletext System B, 625 lines (ETSI EN 300 706)
-  kNABTS,  // Teletext System C, 525 lines (EIA-516 / ITU-R BT.653)
+  kWST,       // Teletext System B, 625 lines (ETSI EN 300 706)
+  kNABTS,     // Teletext System C, 525 lines (EIA-516 / ITU-R BT.653)
+  kVideoDat,  // Pro7 Channel VideoDat, 625 lines: 2 Mbit/s NRZ, 1990-1994
 };
 
 // Which of the two source families a format belongs to.  The distinction is
@@ -199,6 +205,10 @@ bool expand_vbi_source_preset(const std::string& preset_name,
 // Human-readable spelling of a sample format, as used in project files and
 // error messages ("u8", "u16le", "s16le").
 std::string to_string(VBISampleFormat sample_format);
+
+// Human-readable spelling of a data service, as used in provenance,
+// observations and error messages ("WST", "NABTS", "VideoDat").
+std::string to_string(VBITeletextSystem tt_system);
 
 }  // namespace orc
 

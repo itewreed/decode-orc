@@ -52,6 +52,18 @@ double median_of(std::vector<double> values) {
   return 0.5 * (values[middle - 1u] + values[middle]);
 }
 
+// What the fit locates, as its messages name it.
+std::string timing_feature_name(const VBITeletextService& service) {
+  return (service.timing_reference == VBITimingReference::kStartBitEdge)
+             ? "start-bit edge"
+             : "clock run-in";
+}
+
+// The same thing as the head of a sentence.
+std::string timing_feature_sentence(const VBITeletextService& service) {
+  return "The " + timing_feature_name(service);
+}
+
 std::string spread_class_name(VBIOffsetSpreadClass spread_class) {
   switch (spread_class) {
     case VBIOffsetSpreadClass::kTight:
@@ -114,14 +126,14 @@ VBIOffsetCalibration fit_vbi_capture_offset(
 
   if (observations.size() < kMinimumAcceptedRecords) {
     calibration.diagnostics.push_back(
-        "The clock run-in was found on only " +
+        timing_feature_sentence(service) + " was found on only " +
         std::to_string(observations.size()) + " of " +
         std::to_string(records_examined) +
         " sampled records, which is too few to fit a capture offset from. "
-        "Either the capture carries no teletext on the configured lines, or "
-        "the container format, sampling rate or teletext system is wrong.");
-    calibration.summary =
-        "Capture offset calibration failed: no usable clock run-in.";
+        "Either the capture carries no data service on the configured lines, "
+        "or the container format, sampling rate or data service is wrong.");
+    calibration.summary = "Capture offset calibration failed: no usable " +
+                          timing_feature_name(service) + ".";
     return calibration;
   }
 
@@ -235,18 +247,18 @@ VBIOffsetCalibration fit_vbi_capture_offset(
   if (calibration.acceptance_fraction <
       thresholds.minimum_acceptance_fraction) {
     calibration.diagnostics.push_back(
-        "The clock run-in was found on only " +
+        timing_feature_sentence(service) + " was found on only " +
         format_number(calibration.acceptance_fraction * 100.0, 1) +
         "% of the sampled records, below the " +
         format_number(thresholds.minimum_acceptance_fraction * 100.0, 1) +
-        "% this source format expects. The capture may carry teletext on "
+        "% this source format expects. The capture may carry its data on "
         "different lines than configured, or the container format may be "
         "wrong.");
   }
 
   if (calibration.spread_class == VBIOffsetSpreadClass::kUnusable) {
     calibration.diagnostics.push_back(
-        "The clock run-in position varies by " +
+        timing_feature_sentence(service) + " position varies by " +
         format_number(calibration.spread_samples, 2) +
         " samples across the capture, above this format's limit of " +
         format_number(thresholds.maximum_spread_samples, 2) +
@@ -256,7 +268,7 @@ VBIOffsetCalibration fit_vbi_capture_offset(
         "global capture offset cannot describe it.");
   } else if (calibration.spread_class == VBIOffsetSpreadClass::kMild) {
     calibration.warnings.push_back(
-        "The clock run-in position varies by " +
+        timing_feature_sentence(service) + " position varies by " +
         format_number(calibration.spread_samples, 2) + " samples, above the " +
         format_number(thresholds.tight_spread_samples, 2) +
         " samples a cleanly time-base corrected source shows. This is "
@@ -266,7 +278,8 @@ VBIOffsetCalibration fit_vbi_capture_offset(
 
   if (calibration.drift_detected) {
     calibration.diagnostics.push_back(
-        "The clock run-in position drifts monotonically by " +
+        timing_feature_sentence(service) +
+        " position drifts monotonically by " +
         format_number(calibration.drift_total_samples, 2) +
         " samples across the sampled span, which means the configured "
         "sampling rate of " +
@@ -281,8 +294,10 @@ VBIOffsetCalibration fit_vbi_capture_offset(
   calibration.summary =
       std::string(calibration.converged ? "Capture offset "
                                         : "Capture offset (rejected) ") +
-      format_number(calibration.capture_offset_samples, 2) +
-      " samples, run-in at " +
+      format_number(calibration.capture_offset_samples, 2) + " samples, " +
+      (service.timing_reference == VBITimingReference::kStartBitEdge
+           ? "start edge at "
+           : "run-in at ") +
       format_number(calibration.anchor_position_samples, 2) +
       " samples, spread " + format_number(calibration.spread_samples, 2) +
       " samples (" + spread_class_name(calibration.spread_class) +
@@ -308,12 +323,23 @@ bool survey_vbi_cri_positions(const VBILineReader& reader,
                               std::string& error_message) {
   const VBISourceFormat& format = reader.format();
 
+  // A service with a clock run-in is found by correlating a template of it; one
+  // without is found by the edge its first byte opens with, so it has no
+  // template to build.
+  const bool start_bit_edge =
+      service.timing_reference == VBITimingReference::kStartBitEdge;
+
   VBICRITemplate cri_template;
-  if (!make_vbi_cri_frc_template(service, format.sample_rate_hz,
+  if (!start_bit_edge &&
+      !make_vbi_cri_frc_template(service, format.sample_rate_hz,
                                  config.template_config, cri_template,
                                  error_message)) {
     return false;
   }
+
+  VBIStartEdgeConfig edge_config;
+  edge_config.minimum_swing_counts =
+      vbi_start_edge_minimum_swing(format.sample_format);
 
   std::vector<uint64_t> frames;
   const std::optional<uint64_t> frame_count = reader.frame_count();
@@ -345,8 +371,12 @@ bool survey_vbi_cri_positions(const VBILineReader& reader,
     for (const VBILineRecord& record : records.lines) {
       ++records_examined;
       const VBICRIDetection detection =
-          detect_vbi_cri_position(record.samples, cri_template, window,
-                                  format.calibration.acceptance_correlation);
+          start_bit_edge ? detect_vbi_start_edge_position(
+                               record.samples, service, format.sample_rate_hz,
+                               window, edge_config)
+                         : detect_vbi_cri_position(
+                               record.samples, cri_template, window,
+                               format.calibration.acceptance_correlation);
       if (!detection.accepted) {
         continue;
       }

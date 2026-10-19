@@ -28,10 +28,6 @@ std::string tv_system_name(VBITVSystem tv_system) {
   return "unknown";
 }
 
-std::string tt_system_name(VBITeletextSystem tt_system) {
-  return (tt_system == VBITeletextSystem::kWST) ? "WST" : "NABTS";
-}
-
 }  // namespace
 
 const std::vector<uint32_t>& VBITeletextLineMap::for_tv_field(
@@ -52,7 +48,11 @@ bool make_vbi_teletext_line_map(VBITVSystem tv_system,
                                 std::string& error_message) {
   out_line_map = VBITeletextLineMap{};
 
-  if (tv_system == VBITVSystem::kPAL && tt_system == VBITeletextSystem::kWST) {
+  // VideoDat shares the list: its three lines a field sit inside it, and a card
+  // stores the whole of it (see standard_teletext_lines_per_field).
+  if (tv_system == VBITVSystem::kPAL &&
+      (tt_system == VBITeletextSystem::kWST ||
+       tt_system == VBITeletextSystem::kVideoDat)) {
     // ETSI EN 300 706 Section 4.1: World System Teletext occupies broadcast
     // frame lines 7-22 in field 1 and 320-335 in field 2 of a 625-line
     // system.  Stored frame lines are those numbers less one, the CVBS spec
@@ -66,7 +66,8 @@ bool make_vbi_teletext_line_map(VBITVSystem tv_system,
     return true;
   }
 
-  if (tv_system == VBITVSystem::kNTSC || tv_system == VBITVSystem::kPALM) {
+  if ((tv_system == VBITVSystem::kNTSC || tv_system == VBITVSystem::kPALM) &&
+      tt_system != VBITeletextSystem::kVideoDat) {
     // ITU-R BT.653 §2: on 525-line systems both teletext services occupy
     // broadcast frame lines 10-21 in field 1 and 273-284 in field 2 — field
     // line 10 to 21 of each, field 2 starting at broadcast frame line 264.
@@ -79,10 +80,10 @@ bool make_vbi_teletext_line_map(VBITVSystem tv_system,
     return true;
   }
 
-  error_message = "teletext.system " + tt_system_name(tt_system) +
+  error_message = "teletext.system " + to_string(tt_system) +
                   " has no defined line list on " + tv_system_name(tv_system) +
-                  "; WST is defined on PAL and on 525-line systems, and NABTS "
-                  "on NTSC/PAL_M.";
+                  "; WST is defined on PAL and on 525-line systems, NABTS "
+                  "on NTSC/PAL_M, and VideoDat on PAL.";
   return false;
 }
 
@@ -128,12 +129,12 @@ bool map_vbi_record_to_frame_line(const VBISourceFormat& format,
   // than the standard starts at the head of the list.
   const uint32_t table_index = record_index - format.field_range.start;
   if (table_index >= lines.size()) {
-    error_message =
-        "Record " + std::to_string(record_index) +
-        " maps past the end of the " + tt_system_name(format.tt_system) +
-        " line list for television field " + std::to_string(tv_field) +
-        ", which defines " + std::to_string(lines.size()) +
-        " lines; the excess records have no frame line to map to.";
+    error_message = "Record " + std::to_string(record_index) +
+                    " maps past the end of the " + to_string(format.tt_system) +
+                    " line list for television field " +
+                    std::to_string(tv_field) + ", which defines " +
+                    std::to_string(lines.size()) +
+                    " lines; the excess records have no frame line to map to.";
     return false;
   }
 

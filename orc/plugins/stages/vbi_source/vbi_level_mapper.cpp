@@ -130,10 +130,12 @@ VBIRecordWindows vbi_record_windows(const VBISourceFormat& format,
   windows.quiet_end =
       clamp_to_record(std::floor(cri_start - quiet_guard_samples));
 
-  // Run-in: whole samples strictly inside the sixteen alternating bits.
+  // Run-in: whole samples strictly inside the sixteen alternating bits.  A
+  // service with no run-in reads its peak over the whole of its data instead,
+  // whose ones are spread through it rather than gathered at its head.
   windows.cri_begin = clamp_to_record(std::ceil(cri_start));
   windows.cri_end = clamp_to_record(
-      std::floor(cri_start + samples_per_bit * service.cri_bits));
+      std::floor(cri_start + samples_per_bit * service.peak_reference_bits));
 
   // Logic 1 reference: the centre bit of the framing code's leading run of
   // ones, which is settled even on a channel blurred to a full bit period.

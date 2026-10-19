@@ -409,7 +409,9 @@ TEST(VBISourceFormat, PresetNamesAreTheWholeChoiceAndAllExpand) {
           "bt8x8 card dump, 8-bit (WST, NTSC source)",
           "bt8x8 card dump, 8-bit (NABTS, NTSC source)",
           "cx23885 card dump, 8-bit (WST)", "cx23885 card dump, 8-bit (NABTS)",
-          ".tbc VBI crop, 16-bit (WST)", ".tbc VBI crop, 16-bit (NABTS)"}));
+          ".tbc VBI crop, 16-bit (WST)", ".tbc VBI crop, 16-bit (NABTS)",
+          "bt8x8 card dump, 8-bit (VideoDat)",
+          ".tbc VBI crop, 16-bit (VideoDat)"}));
 
   for (const std::string& name : names) {
     VBISourceFormat format;
@@ -436,11 +438,14 @@ TEST(VBISourceFormat, PresetNamesAreFilteredByTelevisionSystem) {
       vbi_source_preset_names(VBITVSystem::kNTSC);
 
   // A PAL project is offered the one card container in its two source
-  // flavours; an NTSC project is offered its two card containers and its .tbc
-  // crop, each in the two services its captures might carry.
+  // flavours and, for VideoDat, that container and its .tbc crop; an NTSC
+  // project is offered its two card containers and its .tbc crop, each in the
+  // two services its captures might carry.
   EXPECT_EQ(pal, (std::vector<std::string>{
                      "bt8x8 card dump, 8-bit (WST)",
-                     "bt8x8 card dump, 8-bit (WST, SECAM source)"}));
+                     "bt8x8 card dump, 8-bit (WST, SECAM source)",
+                     "bt8x8 card dump, 8-bit (VideoDat)",
+                     ".tbc VBI crop, 16-bit (VideoDat)"}));
   EXPECT_EQ(
       ntsc,
       (std::vector<std::string>{

@@ -160,6 +160,8 @@ Everything about a capture — its geometry, its sampling rate, the data service
 | `bt8x8 card dump, 8-bit (WST, NTSC source)` and `(NABTS, NTSC source)` | NTSC | The same card on the driver's other television norm, which is not the same container: 2048 samples per record of which 1600 are real, unsigned 8-bit, at 8×fsc NTSC (28 636 363 Hz); 16 records per field of which the first 12 carry field lines 10–21, the whole of the 525-line teletext list — see below |
 | `cx23885 card dump, 8-bit (WST)` and `(NABTS)` | NTSC | A 525-line capture-card dump from a Hauppauge HVR-1250 or sibling: 1440 samples per record with no padding, unsigned 8-bit, at 27 MHz; 12 records per field carrying field lines 10–21, the whole of the 525-line teletext list — see below |
 | `.tbc VBI crop, 16-bit (WST)` and `(NABTS)` | NTSC | The first 16 line records of each field of a decoded 525-line luma `.tbc`: 910 samples per record with no padding, unsigned 16-bit, at 4×fsc, records 1–12 carrying field lines 10–21 |
+| `bt8x8 card dump, 8-bit (VideoDat)` | PAL | The PAL bt8x8 container, byte for byte, from a Pro 7 Channel VideoDat broadcast — see below |
+| `.tbc VBI crop, 16-bit (VideoDat)` | PAL | The sixteen line records of each field of a decoded 625-line `.tbc` that carry field lines 7–22: 1135 samples per record with no padding, unsigned 16-bit, at 4×fsc — see below |
 
 There is deliberately no "custom" entry. Every fact behind these formats had to be measured off real captures — none of it is recoverable from the file, and guessing at it produces output that looks right and is not.
 
@@ -178,6 +180,10 @@ The other card container, and nothing like the bt8x8 one. Its figures are the Li
 Where the window sits relative to 0H is neither in the file nor usefully in the driver, whose reported offset is a stub zero, so the configured figure is the window SMPTE 125M says the timing generator produces (122 samples at 13,5 MHz after 0H, 244 here) and the real value is measured from the clock run-in as on any card capture. A US network carried its magazine on two or three of the twelve lines, so this entry expects the run-in on a tenth of the sampled records rather than the quarter the PAL entries ask for; every other health check is the bt8x8 one expressed at this card's sampling rate.
 
 Choose the service — WST or NABTS — to match the broadcast. Getting it wrong on a card capture fails the calibration outright and stops the run with a diagnostic, because the offset is fitted against the service's own run-in template; that is intended, and makes the wrong choice loud rather than silent.
+
+**Channel VideoDat**
+
+Pro 7's data service of 1993–1995, decoded by the **VideoDat Sink**. It is not teletext but a 2 Mbit/s byte stream, ten start/stop-framed bytes a line, with no clock run-in, so the timing is measured from the leading edge of the first start bit of each line instead, and only lines whose twenty start and stop bits all read correctly are trusted. On a card capture that fits the capture offset; on a `.tbc` crop, whose records start at 0H, it measures where the broadcaster put the data, which varies between recordings by about a microsecond. All sixteen records are placed, because a card that has not settled its vertical sync moves the data lines between records at the start of a recording, and the sink finds them wherever they land.
 
 **SECAM sources**
 

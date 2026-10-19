@@ -153,6 +153,10 @@ inline const std::vector<PublicStageSpec>& public_stage_specs() {
        [] {
          return orc::StageRegistry::instance().create_stage("nabts_sink");
        }},
+      {"videodat_sink", PublicStageFamily::Sink, true,
+       [] {
+         return orc::StageRegistry::instance().create_stage("videodat_sink");
+       }},
   };
 
   return specs;

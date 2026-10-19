@@ -93,7 +93,8 @@ struct VBIRecordWindows {
   uint32_t quiet_begin = 0;
   uint32_t quiet_end = 0;
 
-  // The clock run-in.
+  // The clock run-in, or for a service without one the data region: the
+  // window whose upper quantile is the logic 1 reference.
   uint32_t cri_begin = 0;
   uint32_t cri_end = 0;
 

@@ -79,6 +79,29 @@ constexpr uint32_t kNABTSCRIFRCPattern = 0xAAAAE7u;
 
 constexpr uint32_t kNABTSPayloadBytes = 33;
 
+// Pro7 Channel VideoDat.  The figures are the ones the reference decoder
+// (channel-videodat-decoder, videodat_decoder.py) slices with, which were in
+// turn reconstructed from the broadcaster's receiving software: NRZ at
+// 2 Mbit/s, ten bytes per line, each a start bit, eight data bits and a stop
+// bit, so a line carries exactly one hundred bit periods — 50 us.
+constexpr double kVideoDatBitRateHz = 2000000.0;
+constexpr uint32_t kVideoDatLineBits = 100;
+
+// Time from 0H to the leading edge of the first start bit.  There is no
+// published figure and the two reference captures disagree: a 1994 LP tape
+// decoded to .tbc puts it at 12,6 us, and the reference decoder's own note on
+// an earlier tape at 123,7 samples after the end of line sync, which is 11,7
+// us. The nominal is between them; a card capture's fit lands the edge on it
+// whatever the transmission did, and a .tbc crop measures it.
+constexpr double kVideoDatOffsetNs = 12200.0;
+
+// Guard either side of the data region: four bit periods, 2 us.  The anchor is
+// a figure the transmissions disagree about by a microsecond, and should a
+// crop's measurement fail the tabulated one has to cover both ends of that
+// disagreement rather than clip the first byte of every line.  Nothing else
+// sits there to be overwritten: the rest of the line is blanking.
+constexpr uint32_t kVideoDatGuardBits = 4;
+
 }  // namespace
 
 bool vbi_teletext_service(VBITVSystem tv_system, VBITeletextSystem tt_system,
@@ -94,6 +117,18 @@ bool vbi_teletext_service(VBITVSystem tv_system, VBITeletextSystem tt_system,
     out_service.frc_leading_ones = kWSTFRCLeadingOnes;
     out_service.cri_frc_pattern = kWSTCRIFRCPattern;
     out_service.payload_bytes = kWSTPayloadBytes;
+    out_service.peak_reference_bits = kWSTCRIBits;
+    return true;
+  }
+
+  if (tv_system == VBITVSystem::kPAL &&
+      tt_system == VBITeletextSystem::kVideoDat) {
+    out_service.t_offset_ns = kVideoDatOffsetNs;
+    out_service.bit_rate_hz = kVideoDatBitRateHz;
+    out_service.line_bits = kVideoDatLineBits;
+    out_service.guard_bits = kVideoDatGuardBits;
+    out_service.peak_reference_bits = kVideoDatLineBits;
+    out_service.timing_reference = VBITimingReference::kStartBitEdge;
     return true;
   }
 
@@ -106,6 +141,7 @@ bool vbi_teletext_service(VBITVSystem tv_system, VBITeletextSystem tt_system,
     out_service.frc_leading_ones = kWSTFRCLeadingOnes;
     out_service.cri_frc_pattern = kWSTCRIFRCPattern;
     out_service.payload_bytes = kWST525PayloadBytes;
+    out_service.peak_reference_bits = kWSTCRIBits;
     return true;
   }
 
@@ -118,13 +154,14 @@ bool vbi_teletext_service(VBITVSystem tv_system, VBITeletextSystem tt_system,
     out_service.frc_leading_ones = kWSTFRCLeadingOnes;
     out_service.cri_frc_pattern = kNABTSCRIFRCPattern;
     out_service.payload_bytes = kNABTSPayloadBytes;
+    out_service.peak_reference_bits = kWSTCRIBits;
     return true;
   }
 
   error_message =
-      "The configured teletext system is not defined on the configured "
-      "television system; WST is defined on PAL and on 525-line systems, and "
-      "NABTS on NTSC/PAL_M.";
+      "The configured data service is not defined on the configured "
+      "television system; WST is defined on PAL and on 525-line systems, "
+      "NABTS on NTSC/PAL_M, and VideoDat on PAL.";
   return false;
 }
 

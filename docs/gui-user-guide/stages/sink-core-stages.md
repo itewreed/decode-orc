@@ -721,6 +721,44 @@ For guidance on selecting and tuning a decoder, see the [Chroma decoder guide](c
 
 ---
 
+## VideoDat Sink
+
+| | |
+|-|-|
+| **Stage id** | `videodat_sink` |
+| **Stage name** | VideoDat Sink |
+| **Connections** | 1 input → no outputs |
+| **Purpose** | Decode Pro 7 Channel VideoDat from the VBI and write the files it carried, with a report of its other services |
+
+**Use this stage when:**
+
+* You have a PAL recording of Pro 7 from 1993–1995 and want the software, pictures and text files Channel VideoDat transmitted with the programme
+* The input is a decoded `.tbc` (through TBC Source), or a bt8x8 card dump or `.tbc` VBI crop through VBI Capture Source with one of its VideoDat formats
+
+**What it does**
+
+The stage searches the first 40 lines of each field for lines whose ten bytes are all correctly framed, times each data line from the end of its line sync where the input carries one (otherwise from its first start bit, following data lines that move within the field), and slices the bits through an equaliser it learns from the recording's own error-free lines. Packets are descrambled and checked against their checksum; damaged packets are repaired from the copies every packet is sent in. The files are then reassembled from their headers and data blocks, damaged headers recovered where counter and length confirm them, and repeated transmissions combined.
+
+The report goes to the chosen file; the recovered files go to a folder next to it with the same name, in the layout of the reference decoder `channel-videodat-decoder` (`strom_XX/` per data stream, `.unvollstaendig` for incomplete files, `dienste/` for the clock, schedule, bit lists and encrypted services).
+
+**Parameters**
+
+* `output_path` (file path) — The report. Required.
+* `write_partial` (bool) — Also write incomplete files and data without a file header. Default: on.
+* `analyse_services` (bool) — Analyse the clock, schedule, bit lists and encrypted services. Default: on.
+* `dump_other` (bool) — Save the packets of every other service raw. Default: off.
+* `save_byte_stream` (bool) — Save the recovered byte stream. Default: off.
+* `use_sync` (bool) — Time lines from the end of line sync where present. Default: on.
+* `use_equaliser` (bool) — Learn an equaliser from the recording. Default: on.
+* `track_lines` (bool) — Follow moving data lines on input without sync. Default: on.
+
+**Notes**
+
+* PAL only. Do not mask the VBI lines before this stage.
+* Purchased software (`CHVDFILE`) and the account services were encrypted per subscriber; the stage names what they hold but does not decrypt them.
+
+---
+
 ## Notes on Sink Stages
 
 * Sink stages terminate pipeline branches.

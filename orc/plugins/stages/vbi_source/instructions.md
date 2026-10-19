@@ -17,7 +17,7 @@ There are three. Everything else about a capture — its geometry, its sampling 
 | Parameter | Meaning |
 |-----------|---------|
 | VBI Capture Path (`input_path`) | Path to the capture. FLAC-wrapped files are unwrapped transparently; the wrapper's declared sample rate is a conventional placeholder and is never used for timing. The browse dialog filters on the extensions these captures arrive under — `.vbi`, `.flac`, `.u8`, `.u16`, `.tbc` — but nothing about a capture is read from its name, so anything else can still be picked through the All Files filter. |
-| Capture Format (`format`) | What the capture is. Only the formats belonging to the project's television system are offered, so a PAL project is offered the one card container in its two source flavours and an NTSC project its two card containers and its `.tbc` crop, each in the two services its captures might carry. |
+| Capture Format (`format`) | What the capture is. Only the formats belonging to the project's television system are offered, so a PAL project is offered the one card container in its two source flavours, and that container and a `.tbc` crop for Channel VideoDat, and an NTSC project its two card containers and its `.tbc` crop, each in the two services its captures might carry. |
 | Dropped Frames (`drops`) | `preserve` (default) emits only the frames present; `pad` emits a blank frame in each gap so output frame *n* stays aligned with source frame *n*. A format carrying no frame counter cannot report drops at all, so neither policy has anything to act on. |
 
 ## The capture formats
@@ -69,6 +69,16 @@ Sample 0 of every record is already 0H and the levels are already the decoder's 
 **Which of the two do I pick?** The one matching the service the broadcast carried. Nothing in the file records it: the two share the same lines and the same 5,7273 Mbit/s bit rate and differ only in framing code (`0xE4` against `0xE7`) and packet length (34 bytes against 33). Of the material in circulation, TBS Electra is **WST** and CBS ExtraVision and NBC Teletext are **NABTS** — US network teletext was NABTS almost throughout, and Electra is the exception. The filename is usually the best evidence you have.
 
 Picking the wrong one is not a disaster here. Because the record is copied index for index, the data is not moved and not rescaled; all that changes is how much of the line is copied, by about fourteen samples at the front and six at the back. The choice is carried through to the stage's output either way, so a downstream decoder is told which service it has been handed rather than left to assume — and whether it can decode what was placed is the slicer's business, not this stage's.
+
+### `bt8x8 card dump, 8-bit (VideoDat)` and `.tbc VBI crop, 16-bit (VideoDat)` — PAL projects
+
+Pro 7's Channel VideoDat, the data service it broadcast in the VBI from 1993 to 1995, captured on the PAL bt8x8 container above (byte for byte the same file) or cut from a decoded 625-line `.tbc`: the sixteen records of each field that carry field lines 7–22, 1135 samples per record with no padding, unsigned 16-bit, at 4×fsc (17 734 475 Hz). Decode the result with the **VideoDat Sink**.
+
+VideoDat is not teletext. It is a 2 Mbit/s NRZ byte stream, ten bytes a line, each framed by a start and a stop bit, with no clock run-in and no framing code. The timing is therefore measured from the leading edge of the first start bit instead: logic 0 is read just ahead of the line and logic 1 across its data, the first upward crossing of their midpoint is refined by folding every bit transition of the line onto the bit period, and only lines whose twenty start and stop bits all read correctly are trusted. On the card capture that fits the capture offset; on the crop, whose records start at 0H, it measures where the broadcaster put the data, which on the two reference recordings was 11,7 and 12,6 µs from 0H.
+
+All sixteen records are placed, not just the two or three lines the service used. A bt848 that has not settled its vertical sync moves the data lines by a few records from frame to frame at the start of a recording, and the VideoDat Sink follows them by their byte framing wherever they land. Because a VideoDat line occupies two or three of sixteen records, the calibration asks for a data line on only 5 % of the sampled records; the reference card capture locks on 18,8 % and the reference crop, an LP tape, on 8,6 %.
+
+The frames carry no sync, so the sink times each line from its start edge. A whole `.tbc` read through TBC Source keeps its line sync, which the sink uses as a steadier reference; on the reference crop that recovers about 4 % more packets than the crop read through this stage.
 
 ### Captures that end short of a whole frame
 

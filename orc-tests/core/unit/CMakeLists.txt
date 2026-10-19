@@ -25,6 +25,7 @@ function(orc_add_core_unit_tests target labels)
                 ${CMAKE_SOURCE_DIR}/orc/plugins/stages/nabts_sink
                 ${CMAKE_SOURCE_DIR}/orc/plugins/stages/teletext_sink
                 ${CMAKE_SOURCE_DIR}/orc/plugins/stages/vbi_source
+                ${CMAKE_SOURCE_DIR}/orc/plugins/stages/videodat_sink
                 ${CMAKE_SOURCE_DIR}/orc/sdk/include
         )
     target_link_libraries(
@@ -91,7 +92,8 @@ function(orc_add_core_unit_tests target labels)
                         orc-stage-plugin-burst-level-analysis-sink
                         orc-stage-plugin-cvbs-sink
                         orc-stage-plugin-teletext-sink
-                        orc-stage-plugin-nabts-sink)
+                        orc-stage-plugin-nabts-sink
+                        orc-stage-plugin-videodat-sink)
                 if(TARGET ${_orc_stage_plugin_target})
                         target_link_libraries(${target} ${_orc_stage_plugin_target})
                 endif()
@@ -132,6 +134,7 @@ orc_add_core_unit_tests(
         stages/vbi_source/vbi_frame_builder_test.cpp
         stages/vbi_source/vbi_frame_index_test.cpp
         stages/vbi_source/vbi_source_stage_test.cpp
+        stages/vbi_source/vbi_videodat_test.cpp
         stages/audio_resample/audio_resampler_test.cpp
 )
 
@@ -183,6 +186,11 @@ orc_add_core_unit_tests(
         stages/audio_sink/audio_sink_stage_deps_test.cpp
         stages/ac3rf_sink/ac3rf_sink_stage_test.cpp
         stages/cc_sink/cc_sink_stage_test.cpp
+        stages/videodat_sink/videodat_line_slicer_test.cpp
+        stages/videodat_sink/videodat_packet_test.cpp
+        stages/videodat_sink/videodat_file_assembler_test.cpp
+        stages/videodat_sink/videodat_pipeline_test.cpp
+        stages/videodat_sink/videodat_sink_stage_test.cpp
         stages/tbc_sink/tbc_sink_stage_test.cpp
         stages/tbc_sink/tbc_sink_stage_deps_test.cpp
         stages/tbc_sink/tbc_sink_levels_test.cpp

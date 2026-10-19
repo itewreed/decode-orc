@@ -30,6 +30,14 @@ constexpr uint16_t kNTSCWSTLogic1 = 624;
 constexpr uint16_t kNTSCNABTSLogic0 = static_cast<uint16_t>(kNtscBlanking);
 constexpr uint16_t kNTSCNABTSLogic1 = 632;
 
+// VideoDat has no published level specification.  Logic 0 is blanking, which
+// is where the line sits between its bytes, and logic 1 is the figure the
+// reference .tbc crop measures: the upper decile of its data region, the same
+// statistic a card capture's logic 1 is read as, sits at 43 869 in the
+// decoder's 16-bit domain, which is 685 counts here.
+constexpr uint16_t kPALVideoDatLogic0 = static_cast<uint16_t>(kPalBlanking);
+constexpr uint16_t kPALVideoDatLogic1 = 685;
+
 }  // namespace
 
 bool make_vbi_output_frame(VBITVSystem tv_system, VBITeletextSystem tt_system,
@@ -46,6 +54,11 @@ bool make_vbi_output_frame(VBITVSystem tv_system, VBITeletextSystem tt_system,
       out_frame.samples_per_line_nominal =
           static_cast<uint32_t>(kPalSamplesPerLineNominal);
       out_frame.levels.blanking = static_cast<uint16_t>(kPalBlanking);
+      if (tt_system == VBITeletextSystem::kVideoDat) {
+        out_frame.levels.logic0 = kPALVideoDatLogic0;
+        out_frame.levels.logic1 = kPALVideoDatLogic1;
+        return true;
+      }
       // PAL has no setup, so black is blanking and the two services' logic 0
       // references coincide.
       out_frame.levels.logic0 = kPALWSTLogic0;
